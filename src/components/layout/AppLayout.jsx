@@ -1,12 +1,12 @@
 import React from 'react';
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { ScrollText, ScanLine, CalendarClock, BookOpen } from 'lucide-react';
+import { ScrollText, ScanLine, Scale, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const tabs = [
   { path: '/', label: 'Multe', icon: ScrollText },
   { path: '/analizza', label: 'Analizza', icon: ScanLine },
-  { path: '/scadenze', label: 'Scadenze', icon: CalendarClock },
+  { path: '/ricorso', label: 'Ricorso', icon: Scale },
   { path: '/guida', label: 'Guida', icon: BookOpen },
 ];
 
@@ -37,7 +37,7 @@ export default function AppLayout() {
       >
         <div className="grid grid-cols-4 h-16">
           {tabs.map(({ path, label, icon: Icon }) => {
-            const attivo = pathname === path;
+            const attivo = path === '/' ? pathname === '/' : pathname.startsWith(path);
             return (
               <Link
                 key={path}

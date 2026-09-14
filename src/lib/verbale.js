@@ -46,6 +46,9 @@ export function nuovoVerbale(patch = {}) {
     indicazioneRicorso: null,   // 'si' | 'no' | null
     fotogrammaAllegato: null,   // 'si' | 'no' | null
 
+    // Luogo risolto su OpenStreetMap: { lat, lon, limiteOsm, fonteLimite, stradaOsm, ... }
+    geo: null,
+
     // Allegati
     fotoVerbale: null,          // data URL
     testoOcr: '',

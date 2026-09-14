@@ -174,6 +174,39 @@ export const REGOLE = [
   },
 
   {
+    id: 'limite-mappa',
+    categoria: 'Autovelox',
+    titolo: 'Limite di velocità del tratto',
+    riferimento: 'art. 142 CdS; dati OpenStreetMap',
+    sintesi: 'Il limite contestato deve essere quello davvero in vigore in quel punto: se la mappa ne dà un altro, è un\'incongruenza da chiarire.',
+    valuta(v) {
+      const contestato = Number(v.limiteVelocita);
+      const mappa = Number(v.geo?.limiteOsm);
+      if (!Number.isFinite(contestato) || !Number.isFinite(mappa) || contestato <= 0 || mappa <= 0) return null;
+      if (contestato === mappa) {
+        return {
+          esito: OK,
+          messaggio: v.geo.fonteLimite === 'osm'
+            ? `Il limite di ${contestato} km/h coincide con quello mappato per ${v.geo.stradaOsm || 'questo tratto'}.`
+            : `Il limite di ${contestato} km/h coincide con quello generale per questo tipo di strada.`,
+        };
+      }
+      if (v.geo.fonteLimite === 'osm') {
+        return {
+          esito: ATTENZIONE,
+          messaggio: `Il verbale contesta un limite di ${contestato} km/h, ma per ${v.geo.stradaOsm || 'questo tratto'} la mappa ne riporta ${mappa}. Se il limite vero è ${mappa}, cambia la fascia di sanzione o fa cadere la violazione.`,
+          azione: 'Vai sul posto e fotografa il cartello del limite, con un riferimento che identifichi il punto. La mappa non fa prova, il cartello sì.',
+        };
+      }
+      return {
+        esito: ATTENZIONE,
+        messaggio: `Il verbale contesta un limite di ${contestato} km/h, mentre il limite generale per questo tipo di strada sarebbe ${mappa}. Un limite diverso da quello generale deve risultare da un'ordinanza e da segnaletica.`,
+        azione: 'Controlla la segnaletica del tratto e, se serve, chiedi al comune l\'ordinanza che istituisce il limite.',
+      };
+    },
+  },
+
+  {
     id: 'autovelox-omologazione',
     categoria: 'Autovelox',
     titolo: 'Omologazione dello strumento',
