@@ -1,0 +1,8 @@
+{
+  "appId": "com.multacheck.app",
+  "appName": "MultaCheck",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}
