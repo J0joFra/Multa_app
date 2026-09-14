@@ -126,6 +126,19 @@ export async function geocodifica(indirizzo, segnale) {
   };
 }
 
+/** Coordinate -> indirizzo leggibile. Serve quando il punto lo scegli sulla mappa. */
+export async function indirizzoDaPunto(lat, lon, segnale) {
+  const url = `${NOMINATIM.replace('/search', '/reverse')}?lat=${lat}&lon=${lon}&format=jsonv2&zoom=18&addressdetails=1`;
+  const r = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': UA }, signal: segnale });
+  if (!r.ok) throw new Error(`Nominatim ${r.status}`);
+  const d = await r.json();
+  if (!d || d.error) return null;
+  const a = d.address || {};
+  const via = [a.road, a.house_number].filter(Boolean).join(' ');
+  const comune = a.city || a.town || a.village || a.municipality || '';
+  return [via, comune].filter(Boolean).join(', ') || d.display_name || null;
+}
+
 /** Coordinate -> limite di velocità delle strade lì intorno. */
 export async function limiteInZona(lat, lon, nomeStrada = '', raggio = 60, segnale) {
   const query = `[out:json][timeout:25];way(around:${raggio},${lat},${lon})["highway"];out tags center 40;`;
@@ -138,6 +151,32 @@ export async function limiteInZona(lat, lon, nomeStrada = '', raggio = 60, segna
   if (!r.ok) throw new Error(`Overpass ${r.status}`);
   const dati = await r.json();
   return interpretaStrade(dati.elements, nomeStrada);
+}
+
+/** Il giro a partire da un punto sulla mappa, invece che da un indirizzo scritto. */
+export async function analizzaPunto(lat, lon, segnale) {
+  let nome = null;
+  try {
+    nome = await indirizzoDaPunto(lat, lon, segnale);
+  } catch {
+    // senza indirizzo il limite vale lo stesso
+  }
+  let limite = null;
+  try {
+    limite = await limiteInZona(lat, lon, nome || '', 60, segnale);
+  } catch {
+    limite = null;
+  }
+  return {
+    lat,
+    lon,
+    nome: nome || `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+    limiteOsm: limite?.limite ?? null,
+    fonteLimite: limite?.fonte ?? null,
+    stradaOsm: limite?.strada ?? null,
+    tipoStrada: limite?.tipo ?? null,
+    aggiornatoIl: new Date().toISOString().slice(0, 10),
+  };
 }
 
 /**

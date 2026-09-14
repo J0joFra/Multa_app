@@ -47,4 +47,9 @@
         android:maxSdkVersion="32" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- "Che limite c'è qui": posizione solo su richiesta esplicita dell'utente. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 </manifest>

@@ -52,9 +52,9 @@ src/lib/        la logica, senza React e testabile a parte
   ocr.js        tesseract.js (modello italiano)
   storage.js    Capacitor Preferences, con fallback su localStorage
   store.jsx     stato condiviso fra le pagine (verbali salvati + bozza)
-src/components/ PageHeader, ThemeToggle, SplashScreen, primitive di form
-  layout/       AppLayout: colonna da 430px e bottom nav a 4 schede
-src/pages/      Multe, Analizza, Scheda, Esito, Ricorso, Guida
+src/components/ PageHeader, ThemeToggle, SplashScreen, Mappa, SegnaleLimite
+  layout/       AppLayout: colonna da 430px e bottom nav a 5 schede
+src/pages/      Multe, Limiti, Analizza, Scheda, Esito, Ricorso, Guida
 test/           44 test su parser, regole, geo e procedure
 ```
 
@@ -93,8 +93,13 @@ volta serve la rete, poi il riconoscimento gira in locale.
 
 ## La mappa e i limiti di velocità
 
-Nell'esito il luogo della violazione è mostrato su una mappa OpenStreetMap, con il
-limite di velocità di quel tratto messo a confronto con quello scritto sul verbale.
+La scheda **Limiti** apre direttamente su una mappa: scrivi la via (o usi la tua
+posizione) e leggi il limite di quel punto, senza dover creare un verbale. Toccando
+la mappa il punto di misura si sposta, e le ultime zone guardate restano lì per la
+volta dopo. Da un punto si può aprire una multa già compilata con luogo e limite.
+
+Nell'esito di un verbale la stessa mappa mostra il luogo della violazione, con il
+limite del tratto messo a confronto con quello scritto sul verbale.
 
 Vale la pena sapere come funziona, perché il dato non è ufficiale:
 

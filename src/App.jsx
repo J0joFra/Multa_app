@@ -6,6 +6,7 @@ import SplashScreen from './components/SplashScreen.jsx';
 import { VerbaliProvider } from './lib/store.jsx';
 import Multe from './pages/Multe.jsx';
 import Analizza from './pages/Analizza.jsx';
+import Limiti from './pages/Limiti.jsx';
 import Scheda from './pages/Scheda.jsx';
 import Esito from './pages/Esito.jsx';
 import Ricorso from './pages/Ricorso.jsx';
@@ -38,6 +39,7 @@ export default function App() {
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<Multe />} />
+            <Route path="/limiti" element={<Limiti />} />
             <Route path="/analizza" element={<Analizza />} />
             <Route path="/scheda/:id" element={<Scheda />} />
             <Route path="/esito/:id" element={<Esito />} />
