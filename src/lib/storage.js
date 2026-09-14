@@ -1,49 +1,65 @@
 import { Preferences } from '@capacitor/preferences';
 
 const CHIAVE = 'multacheck.verbali.v1';
+const CHIAVE_LIMITI = 'multacheck.limiti.v1';
 
 /** Preferences su device, localStorage nel browser: stessa API per entrambi. */
-async function leggiGrezzo() {
+async function leggiGrezzo(chiave) {
   try {
-    const { value } = await Preferences.get({ key: CHIAVE });
+    const { value } = await Preferences.get({ key: chiave });
     if (value != null) return value;
   } catch {
     /* fuori da Capacitor */
   }
   try {
-    return localStorage.getItem(CHIAVE);
+    return localStorage.getItem(chiave);
   } catch {
     return null;
   }
 }
 
-async function scriviGrezzo(value) {
+async function scriviGrezzo(chiave, value) {
   try {
-    await Preferences.set({ key: CHIAVE, value });
+    await Preferences.set({ key: chiave, value });
     return;
   } catch {
     /* fuori da Capacitor */
   }
   try {
-    localStorage.setItem(CHIAVE, value);
+    localStorage.setItem(chiave, value);
   } catch {
     /* quota piena: meglio perdere il salvataggio che bloccare la UI */
   }
 }
 
-export async function caricaVerbali() {
-  const grezzo = await leggiGrezzo();
-  if (!grezzo) return [];
+async function caricaJson(chiave, vuoto) {
+  const grezzo = await leggiGrezzo(chiave);
+  if (!grezzo) return vuoto;
   try {
     const dati = JSON.parse(grezzo);
-    return Array.isArray(dati) ? dati : [];
+    return dati ?? vuoto;
   } catch {
-    return [];
+    return vuoto;
   }
 }
 
+export async function caricaVerbali() {
+  const dati = await caricaJson(CHIAVE, []);
+  return Array.isArray(dati) ? dati : [];
+}
+
 export async function salvaVerbali(verbali) {
-  await scriviGrezzo(JSON.stringify(verbali));
+  await scriviGrezzo(CHIAVE, JSON.stringify(verbali));
+}
+
+/** Le ultime zone cercate: riaprendo la scheda si riparte da dove si era. */
+export async function caricaRicercheLimiti() {
+  const dati = await caricaJson(CHIAVE_LIMITI, []);
+  return Array.isArray(dati) ? dati : [];
+}
+
+export async function salvaRicercheLimiti(ricerche) {
+  await scriviGrezzo(CHIAVE_LIMITI, JSON.stringify(ricerche.slice(0, 6)));
 }
 
 /** Ridimensiona la foto prima di salvarla: i verbali sono leggibili anche a 1400px. */

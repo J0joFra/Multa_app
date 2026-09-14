@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Circle, useMapEvents, useMap } from 'react-leaflet';
 import { Move } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 
@@ -9,14 +9,15 @@ import 'leaflet/dist/leaflet.css';
  * Parte bloccata: dentro una pagina che scorre, una mappa che cattura il
  * trascinamento è una trappola. Un tocco la attiva.
  */
-export default function MappaLuogo({ geo, zoom = 17 }) {
-  const [attiva, setAttiva] = useState(false);
+export default function MappaLuogo({ geo, zoom = 17, altezza = 200, interattiva = false, onPunto }) {
+  const [sbloccata, setSbloccata] = useState(interattiva);
   if (!geo || !Number.isFinite(geo.lat) || !Number.isFinite(geo.lon)) return null;
 
+  const attiva = interattiva || sbloccata;
   const centro = [geo.lat, geo.lon];
 
   return (
-    <div className="relative rounded-xl overflow-hidden border border-gray-200" style={{ height: 200 }}>
+    <div className="relative rounded-xl overflow-hidden border border-gray-200" style={{ height: altezza }}>
       <MapContainer
         center={centro}
         zoom={zoom}
@@ -37,9 +38,11 @@ export default function MappaLuogo({ geo, zoom = 17 }) {
             l'indirizzo, non il metro esatto in cui eri. */}
         <Circle center={centro} radius={40} pathOptions={{ color: '#0A66C2', weight: 1, fillOpacity: 0.12 }} />
         <CircleMarker center={centro} radius={7} pathOptions={{ color: '#fff', weight: 2, fillColor: '#0A66C2', fillOpacity: 1 }} />
+        {onPunto && <AlTocco onPunto={onPunto} />}
+        <Ricentra centro={centro} />
       </MapContainer>
 
-      {!attiva && (
+      {!attiva && !interattiva && (
         <button
           onClick={() => setAttiva(true)}
           className="absolute inset-0 z-[400] flex items-end justify-center pb-3 bg-transparent"
@@ -52,4 +55,19 @@ export default function MappaLuogo({ geo, zoom = 17 }) {
       )}
     </div>
   );
+}
+
+/** Il tocco sulla mappa sposta il punto di misura. */
+function AlTocco({ onPunto }) {
+  useMapEvents({ click: (e) => onPunto(e.latlng.lat, e.latlng.lng) });
+  return null;
+}
+
+/** Una nuova ricerca deve spostare la mappa, non lasciarla dov'era. */
+function Ricentra({ centro }) {
+  const mappa = useMap();
+  React.useEffect(() => {
+    mappa.setView(centro, mappa.getZoom(), { animate: true });
+  }, [centro[0], centro[1]]);   // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
 }
