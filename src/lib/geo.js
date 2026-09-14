@@ -110,6 +110,68 @@ function normalizzaNome(s) {
     .trim();
 }
 
+/**
+ * Gli autovelox fissi mappati su OSM in un riquadro della mappa.
+ *
+ * Sono postazioni fisse, che per legge devono essere segnalate: è
+ * informazione pubblica, e qui serve a capire dove ti hanno multato e se la
+ * postazione era segnalata. Non c'è nessun avviso in tempo reale mentre guidi,
+ * e i controlli mobili non compaiono: quelli non si segnalano.
+ *
+ * Come per i limiti, la copertura è quella che è: una postazione assente dalla
+ * mappa non vuol dire che non esista.
+ */
+export async function autoveloxInBbox(bbox, segnale) {
+  const { sud, ovest, nord, est } = bbox;
+  const area = `${sud},${ovest},${nord},${est}`;
+  const query = `[out:json][timeout:25];(node["highway"="speed_camera"](${area});node["enforcement"="maxspeed"](${area}););out tags center 300;`;
+  const r = await fetch(OVERPASS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `data=${encodeURIComponent(query)}`,
+    signal: segnale,
+  });
+  if (!r.ok) throw new Error(`Overpass ${r.status}`);
+  const dati = await r.json();
+  return interpretaAutovelox(dati.elements);
+}
+
+/** Dai nodi grezzi di Overpass alle postazioni che la mappa sa disegnare. */
+export function interpretaAutovelox(elementi) {
+  const visti = new Set();
+  return (elementi || [])
+    .map((e) => {
+      const lat = e.lat ?? e.center?.lat;
+      const lon = e.lon ?? e.center?.lon;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      const chiave = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+      if (visti.has(chiave)) return null;    // nodo e relazione descrivono la stessa postazione
+      visti.add(chiave);
+      const t = e.tags || {};
+      return {
+        id: e.id ? `${e.type || 'node'}/${e.id}` : chiave,
+        lat,
+        lon,
+        limite: normalizzaMaxspeed(t.maxspeed),
+        direzione: t.direction || t['camera:direction'] || null,
+        tipo: t['speed_camera'] || t.enforcement || t.highway || null,
+        nome: t.name || t.operator || null,
+      };
+    })
+    .filter(Boolean);
+}
+
+/** Distanza in metri fra due punti (formula dell'emisenoverso). */
+export function distanzaMetri(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad;
+  const dLon = (lon2 - lon1) * rad;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(a)));
+}
+
 /** Indirizzo -> coordinate. Restituisce null se non trova nulla. */
 export async function geocodifica(indirizzo, segnale) {
   const q = String(indirizzo || '').trim();

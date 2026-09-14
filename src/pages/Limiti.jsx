@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gauge, Search, LocateFixed, Loader2, Clock, Plus } from 'lucide-react';
+import { Gauge, Search, LocateFixed, Loader2, Clock, Plus, Camera, ZoomIn } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import MappaLuogo from '../components/Mappa.jsx';
 import SegnaleLimite from '../components/SegnaleLimite.jsx';
 import { Avviso } from '../components/ui.jsx';
-import { analizzaLuogo, analizzaPunto } from '../lib/geo.js';
+import { analizzaLuogo, analizzaPunto, autoveloxInBbox, distanzaMetri } from '../lib/geo.js';
 import { caricaRicercheLimiti, salvaRicercheLimiti } from '../lib/storage.js';
 import { useVerbali } from '../lib/store.jsx';
 import { nuovoVerbale } from '../lib/verbale.js';
@@ -14,8 +14,20 @@ import { nuovoVerbale } from '../lib/verbale.js';
  * Il limite di una zona senza passare da un verbale: scrivi la via (o usi la
  * posizione) e lo leggi subito. Toccando la mappa il punto si sposta.
  */
+// Vista d'apertura: l'Italia intera, come una mappa degli autovelox va aperta.
+const ITALIA = [42.3, 12.6];
+const ZOOM_ITALIA = 5.4;
+// Sotto questo zoom il riquadro è troppo largo: la query tornerebbe con
+// migliaia di punti, o non tornerebbe affatto.
+const ZOOM_AUTOVELOX = 11;
+
 export default function Limiti() {
   const [query, setQuery] = useState('');
+  const [autovelox, setAutovelox] = useState([]);
+  const [zoomTroppoLargo, setZoomTroppoLargo] = useState(true);
+  const [caricoVelox, setCaricoVelox] = useState(false);
+  const attesaVista = useRef(null);
+  const annullaVelox = useRef(null);
   const [zona, setZona] = useState(null);
   const [stato, setStato] = useState('pronto'); // pronto | cerco | vuoto | errore
   const [recenti, setRecenti] = useState([]);
@@ -30,6 +42,38 @@ export default function Limiti() {
       setRecenti(r);
       if (r.length > 0) setZona(r[0]);
     });
+  }, []);
+
+  // La mappa si muove di continuo mentre la si trascina: si interroga
+  // Overpass quando si è fermata, e la richiesta precedente si annulla.
+  function vistaCambiata({ bbox, zoom }) {
+    clearTimeout(attesaVista.current);
+    if (zoom < ZOOM_AUTOVELOX) {
+      annullaVelox.current?.abort();
+      setZoomTroppoLargo(true);
+      setAutovelox([]);
+      setCaricoVelox(false);
+      return;
+    }
+    setZoomTroppoLargo(false);
+    attesaVista.current = setTimeout(async () => {
+      annullaVelox.current?.abort();
+      const controllo = new AbortController();
+      annullaVelox.current = controllo;
+      setCaricoVelox(true);
+      try {
+        setAutovelox(await autoveloxInBbox(bbox, controllo.signal));
+      } catch {
+        // rete assente o Overpass occupato: la mappa resta, senza postazioni
+      } finally {
+        if (!controllo.signal.aborted) setCaricoVelox(false);
+      }
+    }, 600);
+  }
+
+  useEffect(() => () => {
+    clearTimeout(attesaVista.current);
+    annullaVelox.current?.abort();
   }, []);
 
   function ricorda(z) {
@@ -121,15 +165,27 @@ export default function Limiti() {
           </button>
         </form>
 
+        <MappaLuogo
+          geo={zona}
+          centro={zona ? undefined : ITALIA}
+          zoom={zona ? 16 : ZOOM_ITALIA}
+          interattiva
+          altezza="min(52vh, 380px)"
+          autovelox={autovelox}
+          onPunto={(lat, lon) => esegui(analizzaPunto(lat, lon))}
+          onVista={vistaCambiata}
+        />
+
+        <BarraAutovelox
+          numero={autovelox.length}
+          troppoLargo={zoomTroppoLargo}
+          carico={caricoVelox}
+        />
+
         {zona ? (
           <>
-            <MappaLuogo
-              geo={zona}
-              interattiva
-              altezza="min(46vh, 340px)"
-              onPunto={(lat, lon) => esegui(analizzaPunto(lat, lon))}
-            />
             <Risultato zona={zona} cercando={stato === 'cerco'} />
+            <Vicini autovelox={autovelox} zona={zona} />
             <button
               onClick={usaPerMulta}
               className="w-full flex items-center justify-center gap-2 text-sm font-semibold py-2.5 rounded-xl bg-white border border-gray-200 text-primary active:bg-gray-50"
@@ -138,14 +194,10 @@ export default function Limiti() {
             </button>
           </>
         ) : (
-          <div className="app-card p-6 text-center">
-            <Gauge className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <h2 className="font-heading font-black text-xl uppercase tracking-wide mb-2">Che limite c&apos;era?</h2>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Scrivi la via e il comune, oppure usa la tua posizione. Poi tocca un punto
-              sulla mappa per spostare la misura.
-            </p>
-          </div>
+          <p className="text-sm text-gray-600 leading-relaxed px-1">
+            Ingrandisci la mappa per vedere gli autovelox fissi, oppure cerca una via per
+            sapere che limite c&apos;è in quel punto.
+          </p>
         )}
 
         {stato === 'vuoto' && (
@@ -185,8 +237,11 @@ export default function Limiti() {
         )}
 
         <Avviso>
-          I limiti vengono da OpenStreetMap: dove non sono mappati mostro quello generale
-          previsto per quel tipo di strada. Fa fede il cartello sul posto, non la mappa.
+          Limiti e postazioni vengono da OpenStreetMap: dove il limite non è mappato mostro
+          quello generale previsto per quel tipo di strada. Sono postazioni fisse, che per
+          legge vanno segnalate, e la mappa non è completa: una che manca può esistere lo
+          stesso. Niente avvisi mentre guidi, e nessun controllo mobile. Fa fede il cartello
+          sul posto, non la mappa.
         </Avviso>
       </div>
     </>
@@ -210,6 +265,58 @@ function Risultato({ zona, cercando }) {
               : 'Limite generale per questo tipo di strada'}
         </p>
         {zona.stradaOsm && <p className="text-[11px] text-gray-400 truncate mt-1">{zona.nome}</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Quante postazioni ci sono nel riquadro che stai guardando. */
+function BarraAutovelox({ numero, troppoLargo, carico }) {
+  if (troppoLargo) {
+    return (
+      <p className="flex items-center gap-2 text-xs text-gray-500 px-1">
+        <ZoomIn className="w-3.5 h-3.5 shrink-0" />
+        Ingrandisci la mappa per vedere gli autovelox fissi
+      </p>
+    );
+  }
+  return (
+    <p className="flex items-center gap-2 text-xs text-gray-500 px-1">
+      <Camera className="w-3.5 h-3.5 shrink-0" style={{ color: '#d8232a' }} />
+      {carico
+        ? 'Cerco le postazioni in questa zona…'
+        : numero === 0
+          ? 'Nessun autovelox fisso mappato in questa zona'
+          : `${numero} ${numero === 1 ? 'autovelox fisso' : 'autovelox fissi'} in questa zona`}
+    </p>
+  );
+}
+
+/** Le postazioni più vicine al punto scelto, con la distanza. */
+function Vicini({ autovelox, zona }) {
+  const vicini = autovelox
+    .map((a) => ({ ...a, distanza: distanzaMetri(zona.lat, zona.lon, a.lat, a.lon) }))
+    .sort((a, b) => a.distanza - b.distanza)
+    .slice(0, 3);
+  if (vicini.length === 0) return null;
+
+  return (
+    <div className="app-card p-4">
+      <p className="text-[11px] font-heading font-bold uppercase tracking-widest text-muted-foreground mb-2">
+        Autovelox più vicini, fra quelli in vista
+      </p>
+      <div className="space-y-2">
+        {vicini.map((a) => (
+          <div key={a.id} className="flex items-center gap-3">
+            <Camera className="w-4 h-4 shrink-0" style={{ color: '#d8232a' }} />
+            <span className="text-sm text-gray-700 flex-1 truncate">
+              {a.nome || 'Postazione fissa'}{a.limite ? ` · ${a.limite} km/h` : ''}
+            </span>
+            <span className="font-mono text-sm text-gray-500 shrink-0">
+              {a.distanza < 1000 ? `${a.distanza} m` : `${(a.distanza / 1000).toFixed(1)} km`}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

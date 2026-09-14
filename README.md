@@ -93,10 +93,19 @@ volta serve la rete, poi il riconoscimento gira in locale.
 
 ## La mappa e i limiti di velocità
 
-La scheda **Limiti** apre direttamente su una mappa: scrivi la via (o usi la tua
-posizione) e leggi il limite di quel punto, senza dover creare un verbale. Toccando
-la mappa il punto di misura si sposta, e le ultime zone guardate restano lì per la
-volta dopo. Da un punto si può aprire una multa già compilata con luogo e limite.
+La scheda **Limiti** apre su una mappa dell'Italia con gli **autovelox fissi**
+mappati su OpenStreetMap (nodi `highway=speed_camera` ed `enforcement=maxspeed`),
+caricati per il riquadro a schermo quando lo zoom è abbastanza stretto. Scrivi la
+via (o usi la tua posizione) e leggi il limite di quel punto, senza dover creare
+un verbale: toccando la mappa il punto di misura si sposta, e le ultime zone
+guardate restano lì per la volta dopo. Da un punto si può aprire una multa già
+compilata con luogo e limite.
+
+Sulle postazioni, due precisazioni che stanno anche nell'app: sono **fisse**, cioè
+installazioni che per legge devono essere segnalate, e servono qui a capire dove ti
+hanno multato e se la postazione era segnalata — non ci sono avvisi in tempo reale
+mentre guidi, e i controlli mobili non compaiono. E la mappa **non è completa**: una
+postazione che manca può esistere lo stesso.
 
 Nell'esito di un verbale la stessa mappa mostra il luogo della violazione, con il
 limite del tratto messo a confronto con quello scritto sul verbale.
