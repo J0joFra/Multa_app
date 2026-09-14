@@ -8,7 +8,7 @@ import Multe from './pages/Multe.jsx';
 import Analizza from './pages/Analizza.jsx';
 import Scheda from './pages/Scheda.jsx';
 import Esito from './pages/Esito.jsx';
-import Scadenze from './pages/Scadenze.jsx';
+import Ricorso from './pages/Ricorso.jsx';
 import Guida from './pages/Guida.jsx';
 
 // HashRouter e non BrowserRouter: dentro la WebView di Capacitor l'app è
@@ -41,7 +41,8 @@ export default function App() {
             <Route path="/analizza" element={<Analizza />} />
             <Route path="/scheda/:id" element={<Scheda />} />
             <Route path="/esito/:id" element={<Esito />} />
-            <Route path="/scadenze" element={<Scadenze />} />
+            <Route path="/ricorso" element={<Ricorso />} />
+            <Route path="/ricorso/:id" element={<Ricorso />} />
             <Route path="/guida" element={<Guida />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

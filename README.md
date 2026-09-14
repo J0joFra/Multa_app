@@ -28,6 +28,7 @@ Tutto resta sul telefono: nessun dato viene inviato a un server.
 | Documentazione fotografica del rosso semaforico | art. 146 CdS |
 | Congruità dell'importo e delle spese di notifica | art. 201 c. 4 CdS |
 | Sconto del 30% entro 5 giorni, e quando non spetta | art. 202 c. 1-bis CdS |
+| Limite del tratto a confronto con quello contestato | art. 142 CdS; dati OpenStreetMap |
 | Termini di ricorso: 60 gg Prefetto, 30 gg Giudice di Pace | artt. 203 e 204-bis CdS |
 | Comunicazione dei dati del conducente entro 60 giorni | art. 126-bis c. 2 CdS |
 | Prescrizione quinquennale | art. 209 CdS; art. 28 L. 689/1981 |
@@ -46,13 +47,15 @@ src/lib/        la logica, senza React e testabile a parte
   regole.js     motore dei controlli + termini e scadenze strutturate
   ricorso.js    bozza di ricorso costruita sui vizi trovati
   luogo.js      link a mappa e Street View + cosa guardare sul posto
+  geo.js        geocodifica Nominatim e limiti di velocità da Overpass/OSM
+  procedure.js  le tre vie: Prefetto, Giudice di Pace, pagamento
   ocr.js        tesseract.js (modello italiano)
   storage.js    Capacitor Preferences, con fallback su localStorage
   store.jsx     stato condiviso fra le pagine (verbali salvati + bozza)
 src/components/ PageHeader, ThemeToggle, SplashScreen, primitive di form
   layout/       AppLayout: colonna da 430px e bottom nav a 4 schede
-src/pages/      Multe, Analizza, Scheda, Esito, Scadenze, Guida
-test/           28 test su parser e motore di regole
+src/pages/      Multe, Analizza, Scheda, Esito, Ricorso, Guida
+test/           44 test su parser, regole, geo e procedure
 ```
 
 Impaginazione e struttura sono le stesse di GridUp: token di colore in HSL su
@@ -88,6 +91,28 @@ l'SDK.
 L'OCR scarica il modello italiano di tesseract.js alla prima esecuzione: quella
 volta serve la rete, poi il riconoscimento gira in locale.
 
+## La mappa e i limiti di velocità
+
+Nell'esito il luogo della violazione è mostrato su una mappa OpenStreetMap, con il
+limite di velocità di quel tratto messo a confronto con quello scritto sul verbale.
+
+Vale la pena sapere come funziona, perché il dato non è ufficiale:
+
+- **In Italia non esiste una mappa pubblica e completa dei limiti.** OpenStreetMap è
+  la fonte libera migliore: il tag `maxspeed` copre bene autostrade e strade
+  principali, molto meno le urbane.
+- Quando il limite non è mappato, l'app ricade sui **limiti generali dell'art. 142
+  CdS** per tipo di strada (130 / 110 / 90 / 50). È una presunzione, e l'interfaccia
+  lo dice: "limite generale per questo tipo di strada", non "limite di questa strada".
+- **Fa fede il cartello, non la mappa.** Un limite diverso da quello generale deve
+  risultare da un'ordinanza e da segnaletica: se mappa e verbale non concordano,
+  l'app apre un controllo da fare sul posto, non dichiara la multa illegittima.
+- Servizi usati: Nominatim per l'indirizzo, Overpass per le strade, tile di OSM per
+  la mappa. Tutti gratuiti e con limiti d'uso: se l'app cresce vanno sostituiti con
+  un servizio con chiave (MapTiler, HERE, TomTom), che ha anche coperture migliori.
+- Il risultato viene salvato nel verbale: la ricerca si fa una volta sola, e da lì
+  in poi la mappa funziona anche offline (tranne le tile).
+
 ## Limiti da conoscere
 
 - **Non è consulenza legale.** L'app applica controlli standard ai dati che le
@@ -102,3 +127,6 @@ volta serve la rete, poi il riconoscimento gira in locale.
   dalla foto hanno il bordo blu: rileggili sempre.
 - **Pagare chiude la partita.** Il pagamento vale come acquiescenza: dopo non
   puoi più fare ricorso. Decidi prima di approfittare dello sconto del 30%.
+- **Gli uffici del ricorso sono territoriali.** La procedura è nazionale, ma
+  Prefettura e Giudice di Pace competenti sono quelli del luogo della violazione:
+  la scheda Ricorso ci porta con una ricerca, non con URL fissi che invecchiano.

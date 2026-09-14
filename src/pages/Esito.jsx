@@ -1,12 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  AlertTriangle, XCircle, CheckCircle2, Info, MapPin, FileText, Copy, Save, Pencil, ShieldCheck,
+  AlertTriangle, XCircle, CheckCircle2, Info, MapPin, Save, Pencil, ShieldCheck, Scale,
+  Gauge, Loader2, Crosshair,
 } from 'lucide-react';
+import MappaLuogo from '../components/Mappa.jsx';
+import { analizzaLuogo } from '../lib/geo.js';
 import PageHeader from '../components/PageHeader.jsx';
 import { Bottone, Sezione, Avviso } from '../components/ui.jsx';
 import { analizzaVerbale, CRITICO, ATTENZIONE, OK, INFO } from '../lib/regole.js';
-import { bozzaRicorso } from '../lib/ricorso.js';
 import { linkLuogo, COSA_GUARDARE } from '../lib/luogo.js';
 import { useVerbali } from '../lib/store.jsx';
 
@@ -22,10 +24,8 @@ const ORDINE = [CRITICO, ATTENZIONE, INFO, OK];
 export default function Esito() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { trova, salva, salvato } = useVerbali();
+  const { trova, salva, salvato, aggiorna } = useVerbali();
   const verbale = trova(id);
-  const [ricorso, setRicorso] = useState(null);
-  const [copiato, setCopiato] = useState(false);
 
   const analisi = useMemo(() => (verbale ? analizzaVerbale(verbale) : null), [verbale]);
 
@@ -46,39 +46,6 @@ export default function Esito() {
   const daGuardare = COSA_GUARDARE[verbale.tipoAccertamento] || COSA_GUARDARE.altro;
   const sv = STILE[analisi.verdetto.livello];
   const inArchivio = salvato(verbale.id);
-
-  async function condividi(testo) {
-    try {
-      const { Share } = await import('@capacitor/share');
-      await Share.share({ title: 'Bozza di ricorso', text: testo });
-    } catch {
-      try {
-        await navigator.clipboard.writeText(testo);
-        setCopiato(true);
-        setTimeout(() => setCopiato(false), 2000);
-      } catch {
-        /* niente clipboard: il testo resta comunque selezionabile a schermo */
-      }
-    }
-  }
-
-  if (ricorso) {
-    return (
-      <>
-        <PageHeader icon={FileText} title="Bozza di ricorso" sottotitolo={ricorso.destinatario} onIndietro={() => setRicorso(null)} />
-        <div className="px-4 py-5 space-y-4">
-          <div className="app-card p-4">
-            <pre className="whitespace-pre-wrap text-[13px] leading-relaxed font-body text-gray-700">{ricorso.testo}</pre>
-          </div>
-          <Bottone onClick={() => condividi(ricorso.testo)}>
-            <span className="flex items-center justify-center gap-2">
-              <Copy className="w-[18px] h-[18px]" /> {copiato ? 'Copiato' : 'Condividi o copia'}
-            </span>
-          </Bottone>
-        </div>
-      </>
-    );
-  }
 
   return (
     <>
@@ -138,7 +105,7 @@ export default function Esito() {
                             {e.azione}
                           </p>
                         )}
-                        <p className="text-[11px] text-gray-400 mt-2 font-mono">{e.riferimento}</p>
+                        <p className="text-xs text-gray-600 font-semibold mt-2">{e.riferimento}</p>
                       </div>
                     </div>
                   </article>
@@ -154,6 +121,9 @@ export default function Esito() {
               <MapPin className="text-primary shrink-0 mt-0.5 w-[18px] h-[18px]" />
               <p className="font-semibold text-gray-900 leading-snug">{verbale.luogo || 'Luogo non indicato'}</p>
             </div>
+
+            <Luogo verbale={verbale} aggiorna={aggiorna} />
+
             {link && (
               <div className="grid grid-cols-2 gap-2 mb-4">
                 <a href={link.streetView} target="_blank" rel="noreferrer" className="text-center text-sm font-medium py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-primary active:bg-gray-100">
@@ -181,11 +151,8 @@ export default function Esito() {
               <span className="flex items-center justify-center gap-2"><Save className="w-[18px] h-[18px]" /> Salva questa multa</span>
             </Bottone>
           )}
-          <Bottone onClick={() => setRicorso({ testo: bozzaRicorso(verbale, 'prefetto'), destinatario: 'Al Prefetto' })}>
-            <span className="flex items-center justify-center gap-2"><FileText className="w-[18px] h-[18px]" /> Bozza di ricorso al Prefetto</span>
-          </Bottone>
-          <Bottone variante="neutro" onClick={() => setRicorso({ testo: bozzaRicorso(verbale, 'giudice'), destinatario: 'Al Giudice di Pace' })}>
-            <span className="flex items-center justify-center gap-2"><FileText className="w-[18px] h-[18px]" /> Bozza per il Giudice di Pace</span>
+          <Bottone onClick={() => navigate(`/ricorso/${verbale.id}`)}>
+            <span className="flex items-center justify-center gap-2"><Scale className="w-[18px] h-[18px]" /> Prepara il ricorso</span>
           </Bottone>
         </div>
 
@@ -197,5 +164,101 @@ export default function Esito() {
         </Avviso>
       </div>
     </>
+  );
+}
+
+/**
+ * Il blocco mappa: risolve l'indirizzo su OpenStreetMap, mostra il punto e
+ * confronta il limite del tratto con quello contestato nel verbale.
+ */
+function Luogo({ verbale, aggiorna }) {
+  const [stato, setStato] = React.useState('idle'); // idle | carico | vuoto | errore
+  const geo = verbale.geo;
+
+  async function cerca() {
+    setStato('carico');
+    try {
+      const trovato = await analizzaLuogo(verbale.luogo);
+      if (!trovato) return setStato('vuoto');
+      aggiorna(verbale.id, { geo: trovato });
+      setStato('idle');
+    } catch {
+      setStato('errore');
+    }
+  }
+
+  if (!verbale.luogo) {
+    return (
+      <p className="text-sm text-gray-500 leading-relaxed mb-4">
+        Scrivi l&apos;indirizzo nella scheda del verbale e te lo mostro sulla mappa, con il
+        limite di velocità di quel tratto.
+      </p>
+    );
+  }
+
+  if (!geo) {
+    return (
+      <div className="mb-4">
+        <button
+          onClick={cerca}
+          disabled={stato === 'carico'}
+          className="w-full flex items-center justify-center gap-2 text-sm font-semibold py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-primary active:bg-gray-100 disabled:opacity-50"
+        >
+          {stato === 'carico'
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Cerco il punto…</>
+            : <><Crosshair className="w-4 h-4" /> Mostra sulla mappa e trova il limite</>}
+        </button>
+        {stato === 'vuoto' && (
+          <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+            Non ho trovato questo indirizzo. Prova a scriverlo per esteso nella scheda, con
+            il comune: &quot;Via Palmanova 45, Milano&quot;.
+          </p>
+        )}
+        {stato === 'errore' && (
+          <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+            Non sono riuscito a raggiungere la mappa. Serve la rete: riprova quando sei
+            connesso.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const contestato = Number(verbale.limiteVelocita);
+  const mappa = Number(geo.limiteOsm);
+  const discorde = Number.isFinite(contestato) && Number.isFinite(mappa) && contestato !== mappa;
+
+  return (
+    <div className="mb-4 space-y-3">
+      <MappaLuogo geo={geo} />
+
+      {Number.isFinite(mappa) ? (
+        <div className={`rounded-xl px-4 py-3 border ${discorde ? 'bg-amber-50 border-esito-attenzione/40' : 'bg-gray-50 border-gray-100'}`}>
+          <div className="flex items-center gap-2">
+            <Gauge className={`w-4 h-4 shrink-0 ${discorde ? 'text-esito-attenzione' : 'text-primary'}`} />
+            <p className="text-[10px] font-heading font-bold uppercase tracking-widest text-muted-foreground">
+              Limite del tratto
+            </p>
+          </div>
+          <p className="font-heading font-black text-3xl mt-1">
+            {mappa} <span className="text-base font-body font-semibold text-gray-500">km/h</span>
+            {Number.isFinite(contestato) && contestato !== mappa && (
+              <span className="text-base font-body font-semibold text-gray-500"> · sul verbale {contestato}</span>
+            )}
+          </p>
+          <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+            {geo.fonteLimite === 'osm'
+              ? `Limite mappato su OpenStreetMap per ${geo.stradaOsm || 'questo tratto'}.`
+              : 'Nessun limite mappato qui: questo è il limite generale previsto per questo tipo di strada.'}
+            {' '}Fa fede il cartello sul posto, non la mappa.
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Per questo tratto OpenStreetMap non riporta un limite e la strada non è
+          classificata abbastanza da dedurlo. Guarda i cartelli sul posto.
+        </p>
+      )}
+    </div>
   );
 }
