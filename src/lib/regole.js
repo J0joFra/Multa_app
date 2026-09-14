@@ -8,8 +8,20 @@ export const ATTENZIONE = 'attenzione'; // da verificare, può diventare un moti
 export const OK = 'ok';                 // controllo superato
 export const INFO = 'info';             // scadenza o adempimento, non un vizio
 
+/** Giorni entro cui va fatta ogni cosa. Un solo posto da correggere se la legge cambia. */
+export const TERMINI = {
+  notifica: 90,
+  notificaEstero: 360,
+  sconto: 5,
+  giudiceDiPace: 30,
+  prefetto: 60,
+  datiConducente: 60,
+  prescrizione: 365 * 5,
+  tarauraValidita: 365,
+};
+
 /** Data da cui decorrono i termini: contestazione immediata o notifica. */
-function dataDecorrenza(v) {
+export function dataDecorrenza(v) {
   return v.contestazioneImmediata ? v.dataViolazione : v.dataNotifica || v.dataViolazione;
 }
 
@@ -23,6 +35,7 @@ export const REGOLE = [
     categoria: 'Notifica',
     titolo: 'Termine di notifica del verbale',
     riferimento: 'art. 201 comma 1 CdS',
+    sintesi: 'Se non ti hanno fermato sul posto, il verbale deve arrivarti entro 90 giorni dalla violazione (360 se risiedi all\'estero). Oltre, non è più esigibile.',
     valuta(v) {
       if (v.contestazioneImmediata) {
         return {
@@ -37,7 +50,7 @@ export const REGOLE = [
           azione: 'Cerca sul verbale la data dell\'accertamento e la data di notifica (di solito sulla busta o sulla relata).',
         };
       }
-      const limite = v.residenteEstero ? 360 : 90;
+      const limite = v.residenteEstero ? TERMINI.notificaEstero : TERMINI.notifica;
       const g = giorniTra(v.dataViolazione, v.dataNotifica);
       if (g === null) return null;
       if (g < 0) {
@@ -66,6 +79,7 @@ export const REGOLE = [
     categoria: 'Notifica',
     titolo: 'Motivo della mancata contestazione immediata',
     riferimento: 'art. 201 comma 1 CdS',
+    sintesi: 'Quando non ti fermano, il verbale deve dire perché non era possibile farlo. Se non lo dice, è viziato.',
     valuta(v) {
       if (v.contestazioneImmediata) return null;
       if (v.motivazioneMancataContestazione === false) {
@@ -89,6 +103,7 @@ export const REGOLE = [
     categoria: 'Forma del verbale',
     titolo: 'Elementi essenziali del verbale',
     riferimento: 'art. 383 Reg. esec. CdS',
+    sintesi: 'Il verbale deve contenere numero, organo accertatore, data, luogo, norma violata e importo.',
     valuta(v) {
       const mancanti = CAMPI_OBBLIGATORI
         .filter(([campo]) => v[campo] === '' || v[campo] === null || v[campo] === undefined)
@@ -109,6 +124,7 @@ export const REGOLE = [
     categoria: 'Forma del verbale',
     titolo: 'Indicazione dei modi di ricorso',
     riferimento: 'art. 201 comma 5 CdS',
+    sintesi: 'Il verbale deve dirti a chi puoi fare ricorso, come e entro quando.',
     valuta(v) {
       if (v.indicazioneRicorso === 'no') {
         return {
@@ -128,6 +144,7 @@ export const REGOLE = [
     categoria: 'Autovelox',
     titolo: 'Tolleranza strumentale sulla velocità',
     riferimento: 'art. 142 comma 6 CdS',
+    sintesi: 'Alla velocità misurata va tolto il 5%, con un minimo di 5 km/h. Spesso basta a cambiare fascia di sanzione, o a far sparire la violazione.',
     valuta(v) {
       const ril = Number(v.velocitaRilevata);
       if (!Number.isFinite(ril) || ril <= 0) return null;
@@ -161,6 +178,7 @@ export const REGOLE = [
     categoria: 'Autovelox',
     titolo: 'Omologazione dello strumento',
     riferimento: 'art. 142 comma 6 CdS; Cass. civ. n. 10505/2024',
+    sintesi: 'Approvato e omologato non sono la stessa cosa: per la Cassazione un dispositivo solo approvato non regge la sanzione.',
     valuta(v) {
       if (v.tipoAccertamento !== 'autovelox' && v.tipoAccertamento !== 'semaforo') return null;
       if (v.strumentoOmologato === 'no') {
@@ -184,6 +202,7 @@ export const REGOLE = [
     categoria: 'Autovelox',
     titolo: 'Taratura periodica del dispositivo',
     riferimento: 'Corte cost. n. 113/2015; art. 142 comma 6 CdS',
+    sintesi: 'Il dispositivo va verificato e tarato almeno una volta l\'anno, e il verbale deve darne conto.',
     valuta(v) {
       if (v.tipoAccertamento !== 'autovelox' && v.tipoAccertamento !== 'semaforo') return null;
       if (!v.dataTaratura) {
@@ -201,7 +220,7 @@ export const REGOLE = [
           messaggio: `La taratura indicata (${formatIT(v.dataTaratura)}) è successiva alla violazione: alla data del rilievo non copriva lo strumento.`,
         };
       }
-      if (g > 365) {
+      if (g > TERMINI.tarauraValidita) {
         return {
           esito: CRITICO,
           messaggio: `Ultima taratura ${formatIT(v.dataTaratura)}, cioè ${g} giorni prima della violazione: oltre l'anno. La verifica va ripetuta almeno annualmente.`,
@@ -216,6 +235,7 @@ export const REGOLE = [
     categoria: 'Autovelox',
     titolo: 'Segnalazione preventiva della postazione',
     riferimento: 'art. 142 comma 6-bis CdS; DM 15/08/2007',
+    sintesi: 'La postazione va segnalata prima, con un cartello visibile: il controllo serve a far rallentare, non a sorprendere.',
     valuta(v) {
       if (v.tipoAccertamento !== 'autovelox') return null;
       if (v.segnaleticaPreventiva === 'no') {
@@ -240,6 +260,7 @@ export const REGOLE = [
     categoria: 'Autovelox',
     titolo: 'Decreto prefettizio per il rilevamento senza contestazione',
     riferimento: 'art. 4 D.L. 121/2002',
+    sintesi: 'Rilevare senza fermare il veicolo è ammesso solo sulle strade individuate con decreto del Prefetto.',
     valuta(v) {
       if (v.tipoAccertamento !== 'autovelox' || v.contestazioneImmediata) return null;
       if (v.decretoPrefettizio === 'no') {
@@ -263,6 +284,7 @@ export const REGOLE = [
     categoria: 'ZTL',
     titolo: 'Segnaletica e autorizzazione del varco',
     riferimento: 'DPR 250/1999; art. 7 CdS',
+    sintesi: 'Il varco dev\'essere autorizzato e il cartello con orari e deroghe leggibile prima di entrare.',
     valuta(v) {
       if (v.tipoAccertamento !== 'ztl') return null;
       return {
@@ -278,6 +300,7 @@ export const REGOLE = [
     categoria: 'Semaforo',
     titolo: 'Documentazione fotografica del passaggio',
     riferimento: 'art. 146 CdS',
+    sintesi: 'Per il rosso la prova sono i fotogrammi, e il giallo deve durare quanto previsto per quel limite.',
     valuta(v) {
       if (v.tipoAccertamento !== 'semaforo') return null;
       if (v.fotogrammaAllegato === 'no') {
@@ -298,6 +321,7 @@ export const REGOLE = [
     categoria: 'Importi',
     titolo: 'Congruità dell\'importo',
     riferimento: 'tabella sanzioni CdS',
+    sintesi: 'L\'importo deve stare nella forbice prevista dall\'articolo contestato.',
     valuta(v) {
       const info = infoViolazione(v.articolo, v.comma);
       const imp = Number(v.importo);
@@ -318,6 +342,7 @@ export const REGOLE = [
     categoria: 'Importi',
     titolo: 'Spese di notifica e di procedimento',
     riferimento: 'art. 201 comma 4 CdS',
+    sintesi: 'Le spese di notifica devono corrispondere a quelle realmente sostenute e vanno documentate su richiesta.',
     valuta(v) {
       const s = Number(v.speseNotifica);
       if (!Number.isFinite(s) || s <= 0) return null;
@@ -336,6 +361,7 @@ export const REGOLE = [
     categoria: 'Scadenze',
     titolo: 'Pagamento ridotto del 30%',
     riferimento: 'art. 202 comma 1-bis CdS',
+    sintesi: 'Pagando entro 5 giorni si sconta il 30%, tranne dove è prevista la sospensione della patente o la confisca. Pagare però chiude ogni ricorso.',
     valuta(v, oggi) {
       const base = dataDecorrenza(v);
       if (!base) return null;
@@ -346,7 +372,7 @@ export const REGOLE = [
           messaggio: `Per ${info.titolo} è prevista una sanzione accessoria: lo sconto del 30% non spetta.`,
         };
       }
-      const scadenza = addGiorni(base, 5);
+      const scadenza = addGiorni(base, TERMINI.sconto);
       const restanti = giorniTra(oggi, scadenza);
       const imp = Number(v.importo);
       const scontato = Number.isFinite(imp) && imp > 0 ? (imp * 0.7).toFixed(2) : null;
@@ -368,10 +394,11 @@ export const REGOLE = [
     categoria: 'Scadenze',
     titolo: 'Ricorso al Prefetto',
     riferimento: 'art. 203 CdS',
+    sintesi: '60 giorni, gratuito, ma se il Prefetto respinge l\'importo può salire.',
     valuta(v, oggi) {
       const base = dataDecorrenza(v);
       if (!base) return null;
-      const scadenza = addGiorni(base, 60);
+      const scadenza = addGiorni(base, TERMINI.prefetto);
       const restanti = giorniTra(oggi, scadenza);
       if (restanti === null) return null;
       if (restanti < 0) {
@@ -389,10 +416,11 @@ export const REGOLE = [
     categoria: 'Scadenze',
     titolo: 'Ricorso al Giudice di Pace',
     riferimento: 'art. 204-bis CdS',
+    sintesi: '30 giorni, con contributo unificato, ma a decidere è un giudice.',
     valuta(v, oggi) {
       const base = dataDecorrenza(v);
       if (!base) return null;
-      const scadenza = addGiorni(base, 30);
+      const scadenza = addGiorni(base, TERMINI.giudiceDiPace);
       const restanti = giorniTra(oggi, scadenza);
       if (restanti === null) return null;
       if (restanti < 0) {
@@ -410,6 +438,7 @@ export const REGOLE = [
     categoria: 'Adempimenti',
     titolo: 'Comunicazione dei dati del conducente',
     riferimento: 'art. 126-bis comma 2 CdS',
+    sintesi: 'Se la multa toglie punti ed è intestata al proprietario, va comunicato chi guidava entro 60 giorni: il silenzio costa una sanzione più pesante.',
     valuta(v, oggi) {
       const info = infoViolazione(v.articolo, v.comma);
       const punti = Number.isFinite(Number(v.puntiDecurtati))
@@ -417,7 +446,7 @@ export const REGOLE = [
         : (info ? info.punti : 0);
       if (!v.notificaAlProprietario || !punti) return null;
       const base = dataDecorrenza(v);
-      const scadenza = base ? addGiorni(base, 60) : null;
+      const scadenza = base ? addGiorni(base, TERMINI.datiConducente) : null;
       const restanti = scadenza ? giorniTra(oggi, scadenza) : null;
       return {
         esito: INFO,
@@ -432,12 +461,13 @@ export const REGOLE = [
     categoria: 'Scadenze',
     titolo: 'Prescrizione quinquennale',
     riferimento: 'art. 209 CdS; art. 28 L. 689/1981',
+    sintesi: 'Dopo 5 anni senza atti interruttivi il diritto a riscuotere si prescrive.',
     valuta(v, oggi) {
       if (!v.dataViolazione) return null;
       const g = giorniTra(v.dataViolazione, oggi);
-      if (g === null || g < 365 * 4) return null;
-      const scadenza = addGiorni(v.dataViolazione, 365 * 5);
-      if (g > 365 * 5) {
+      if (g === null || g < TERMINI.prescrizione - 365) return null;
+      const scadenza = addGiorni(v.dataViolazione, TERMINI.prescrizione);
+      if (g > TERMINI.prescrizione) {
         return {
           esito: CRITICO,
           messaggio: `Sono passati più di 5 anni dalla violazione (termine scaduto il ${formatIT(scadenza)}). Salvo atti interruttivi notificati nel frattempo, il diritto a riscuotere è prescritto.`,
@@ -480,6 +510,54 @@ export function analizzaVerbale(verbale, oggi = oggiISO()) {
   for (const e of esiti) conteggi[e.esito] += 1;
 
   return { esiti, conteggi, verdetto: verdetto(conteggi) };
+}
+
+/**
+ * Le scadenze di un verbale in forma strutturata, per l'agenda.
+ * Le regole INFO raccontano la stessa cosa a parole: qui servono le date.
+ */
+export function scadenzeVerbale(v, oggi = oggiISO()) {
+  const base = dataDecorrenza(v);
+  if (!base) return [];
+
+  const info = infoViolazione(v.articolo, v.comma);
+  const accessoria = info && (info.accessorie === 'sospensione' || info.accessorie === 'confisca');
+  const punti = Number.isFinite(Number(v.puntiDecurtati)) ? Number(v.puntiDecurtati) : (info ? info.punti : 0);
+  const imp = Number(v.importo);
+
+  const voci = [
+    !accessoria && {
+      id: 'sconto',
+      titolo: 'Pagamento ridotto del 30%',
+      data: addGiorni(base, TERMINI.sconto),
+      nota: Number.isFinite(imp) && imp > 0 ? `Paghi ${(imp * 0.7).toFixed(2)} € invece di ${imp.toFixed(2)} €` : 'Sconto del 30% sull\'importo',
+    },
+    {
+      id: 'giudice',
+      titolo: 'Ricorso al Giudice di Pace',
+      data: addGiorni(base, TERMINI.giudiceDiPace),
+      nota: 'Con contributo unificato, decide un giudice',
+    },
+    {
+      id: 'prefetto',
+      titolo: 'Ricorso al Prefetto',
+      data: addGiorni(base, TERMINI.prefetto),
+      nota: 'Gratuito, ma in caso di rigetto l\'importo può salire',
+    },
+    v.notificaAlProprietario && punti > 0 && {
+      id: 'conducente',
+      titolo: 'Comunicazione dei dati del conducente',
+      data: addGiorni(base, TERMINI.datiConducente),
+      nota: `Obbligatoria: la violazione comporta ${punti} punti`,
+    },
+  ].filter(Boolean);
+
+  return voci
+    .map((s) => {
+      const restanti = giorniTra(oggi, s.data);
+      return { ...s, restanti, scaduta: restanti !== null && restanti < 0, verbaleId: v.id };
+    })
+    .sort((a, b) => String(a.data).localeCompare(String(b.data)));
 }
 
 function verdetto({ critico, attenzione }) {

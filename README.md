@@ -43,14 +43,27 @@ src/lib/        la logica, senza React e testabile a parte
   cds.js        catalogo delle violazioni: importi, punti, sanzioni accessorie
   verbale.js    struttura dati del verbale + campi obbligatori
   parser.js     estrazione dei campi dal testo dell'OCR
-  regole.js     motore dei controlli: ogni regola è una funzione pura
+  regole.js     motore dei controlli + termini e scadenze strutturate
   ricorso.js    bozza di ricorso costruita sui vizi trovati
   luogo.js      link a mappa e Street View + cosa guardare sul posto
   ocr.js        tesseract.js (modello italiano)
   storage.js    Capacitor Preferences, con fallback su localStorage
-src/screens/    elenco, acquisizione, scheda, analisi
+  store.jsx     stato condiviso fra le pagine (verbali salvati + bozza)
+src/components/ PageHeader, ThemeToggle, SplashScreen, primitive di form
+  layout/       AppLayout: colonna da 430px e bottom nav a 4 schede
+src/pages/      Multe, Analizza, Scheda, Esito, Scadenze, Guida
 test/           28 test su parser e motore di regole
 ```
+
+Impaginazione e struttura sono le stesse di GridUp: token di colore in HSL su
+variabili CSS, `.app-card` bianche su fondo grigio, testata sticky a gradiente,
+bottom nav fissa, transizioni di pagina con framer-motion, tema chiaro e scuro.
+I colori sono blu LinkedIn (`#0A66C2`, `hsl(210 90% 40%)`) e bianco; in tema
+scuro la stessa famiglia vira sul navy.
+
+La bozza in compilazione vive nello store, non in uno `useState` di pagina:
+`AnimatePresence` rimonta il componente entrante e lo stato locale andrebbe
+perso a metà scheda.
 
 Le regole sono funzioni pure `(verbale, oggi) -> esito | null`: per aggiungerne
 una basta un oggetto in più nell'array `REGOLE` e un test.

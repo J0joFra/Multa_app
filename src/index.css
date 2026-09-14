@@ -1,23 +1,169 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+@layer base {
+  :root {
+    --font-heading: 'Barlow Condensed', sans-serif;
+    --font-body:    'DM Sans', sans-serif;
+    --font-mono:    'JetBrains Mono', monospace;
 
-html, body, #root { height: 100%; }
+    /* ── Tema chiaro — bianco su grigio appena azzurrato ─────────────────── */
+    --background:         210 20% 96%;
+    --foreground:         214 30% 12%;
 
-body {
-  margin: 0;
-  background: #0d1117;
-  color: #e6edf3;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-tap-highlight-color: transparent;
+    --card:               0 0% 100%;
+    --card-foreground:    214 30% 12%;
+
+    --popover:            0 0% 100%;
+    --popover-foreground: 214 30% 12%;
+
+    /* Blu LinkedIn #0A66C2 */
+    --primary:            210 90% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary:          210 22% 94%;
+    --secondary-foreground: 214 18% 38%;
+
+    --muted:              210 22% 94%;
+    --muted-foreground:   214 12% 48%;
+
+    --accent:             210 90% 40%;
+    --accent-foreground:  0 0% 100%;
+
+    --destructive:        0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:             210 20% 89%;
+    --input:              210 20% 89%;
+    --ring:               210 90% 40%;
+
+    /* Card scura "hero" */
+    --dark-card:          212 45% 15%;
+    --dark-card-fg:       0 0% 100%;
+
+    /* Esiti dei controlli */
+    --esito-ok:           152 60% 34%;
+    --esito-attenzione:   36 92% 42%;
+    --esito-critico:      0 72% 51%;
+
+    --radius: 1.25rem;
+  }
+
+  /* ── Tema scuro — navy della stessa famiglia del blu LinkedIn ──────────── */
+  .dark {
+    --background:           213 45% 8%;
+    --foreground:           210 25% 96%;
+
+    --card:                 213 38% 14%;
+    --card-foreground:      210 25% 96%;
+
+    --popover:              213 38% 14%;
+    --popover-foreground:   210 25% 96%;
+
+    --secondary:            212 30% 24%;
+    --secondary-foreground: 210 25% 92%;
+
+    --muted:                213 34% 17%;
+    --muted-foreground:     210 16% 70%;
+
+    --primary:              210 92% 58%;
+    --primary-foreground:   213 45% 8%;
+
+    --accent:               210 92% 58%;
+    --accent-foreground:    213 45% 8%;
+
+    --border:               213 30% 20%;
+    --input:                213 30% 20%;
+    --ring:                 210 92% 58%;
+
+    --dark-card:            213 38% 14%;
+    --dark-card-fg:         210 25% 96%;
+
+    --esito-ok:             152 52% 48%;
+    --esito-attenzione:     38 92% 58%;
+    --esito-critico:        0 76% 62%;
+  }
 }
 
-/* Spazio per notch e barra di navigazione Android. */
-.safe-top { padding-top: env(safe-area-inset-top); }
-.safe-bottom { padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
+@layer base {
+  * { @apply border-border; box-sizing: border-box; }
 
-input, select, textarea {
-  font-size: 16px; /* impedisce lo zoom automatico su focus */
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    letter-spacing: 0.01em;
+  }
+
+  /* 16px sul campo impedisce lo zoom automatico di Android al focus. */
+  input, select, textarea { font-size: 16px; }
 }
+
+@layer utilities {
+  .font-heading { font-family: var(--font-heading); }
+  .font-mono    { font-family: var(--font-mono); }
+
+  /* Card dell'app: bianca in chiaro, superficie navy in scuro. */
+  .app-card {
+    @apply bg-card rounded-2xl;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
+  }
+
+  .dark-card {
+    background: hsl(var(--dark-card));
+    color: hsl(var(--dark-card-fg));
+    @apply rounded-2xl;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  }
+
+  .tag {
+    @apply text-[10px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded-full;
+    font-family: var(--font-heading);
+  }
+
+  .pb-nav { padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+  .accent-bar { @apply relative pl-3; }
+  .accent-bar::before {
+    content: '';
+    @apply absolute left-0 top-0 bottom-0 w-1 rounded-full bg-primary;
+  }
+}
+
+/* ── Tema scuro: rimappa i grigi "letterali" usati nelle pagine ───────────── */
+.dark .bg-white       { background-color: hsl(213 38% 14%); }
+.dark .bg-white\/90   { background-color: hsl(213 38% 14% / 0.94); }
+.dark .bg-gray-50     { background-color: hsl(213 34% 17%); }
+.dark .bg-gray-100    { background-color: hsl(213 32% 20%); }
+.dark .bg-gray-200    { background-color: hsl(212 30% 26%); }
+
+.dark .text-gray-900  { color: hsl(210 25% 96%); }
+.dark .text-gray-800  { color: hsl(210 22% 90%); }
+.dark .text-gray-700  { color: hsl(210 18% 82%); }
+.dark .text-gray-600  { color: hsl(210 16% 74%); }
+.dark .text-gray-500  { color: hsl(210 16% 70%); }
+.dark .text-gray-400  { color: hsl(210 14% 60%); }
+
+.dark .border-gray-100 { border-color: hsl(213 30% 20%); }
+.dark .border-gray-200 { border-color: hsl(213 30% 24%); }
+
+.dark .active\:bg-gray-50:active { background-color: hsl(213 34% 17%); }
+
+.dark nav.fixed { background-color: hsl(213 38% 14%); border-color: hsl(213 30% 20%); }
+.dark .app-card { box-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0.4); }
+
+/* tinte chiare dei badge — in scuro diventano fondi tenui della stessa tinta */
+.dark .bg-red-50     { background-color: hsl(0 40% 18%); }
+.dark .bg-amber-50   { background-color: hsl(38 40% 16%); }
+.dark .bg-emerald-50 { background-color: hsl(152 35% 14%); }
+.dark .bg-blue-50    { background-color: hsl(212 45% 20%); }

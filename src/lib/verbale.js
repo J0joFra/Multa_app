@@ -14,6 +14,7 @@ export function nuovoVerbale(patch = {}) {
     // Violazione
     articolo: '',            // "142"
     comma: '',               // "8"
+    articoloManuale: false,  // l'utente ha scelto "Altro articolo" nell'elenco
     descrizione: '',
     dataViolazione: '',      // ISO
     oraViolazione: '',
