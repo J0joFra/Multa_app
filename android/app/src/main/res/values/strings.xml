@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MultaCheck</string>
+    <string name="title_activity_main">MultaCheck</string>
+    <string name="package_name">com.multacheck.app</string>
+    <string name="custom_url_scheme">com.multacheck.app</string>
+</resources>
