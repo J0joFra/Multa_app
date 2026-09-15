@@ -107,6 +107,41 @@ hanno multato e se la postazione era segnalata — non ci sono avvisi in tempo r
 mentre guidi, e i controlli mobili non compaiono. E la mappa **non è completa**: una
 postazione che manca può esistere lo stesso.
 
+### Da dove arrivano le postazioni
+
+Ci sono due strade, e l'app le usa entrambe:
+
+1. **Archivio in pacchetto** (preferito). `npm run autovelox` estrae da
+   OpenStreetMap tutte le postazioni fisse italiane e le scrive in
+   `public/dati/autovelox-it.geojson`. L'app carica quel file una volta e filtra
+   in memoria: si vedono subito, da più lontano e anche senza rete. Il file **non
+   è nel repository** e va generato (vedi `public/dati/LEGGIMI.md`).
+2. **Overpass dal vivo** (ripiego). Senza quel file l'app interroga Overpass a
+   ogni spostamento della mappa: funziona, ma richiede rete, mostra le postazioni
+   solo da uno zoom più stretto e carica un servizio pubblico gratuito.
+
+Lo script accetta anche un file già scaricato, così si può partire da un estratto
+Geofabrik invece che da Overpass:
+
+```bash
+wget https://download.geofabrik.de/europe/italy-latest.osm.pbf
+osmium tags-filter italy-latest.osm.pbf n/highway=speed_camera n/enforcement=maxspeed -o velox.pbf
+osmium export velox.pbf -f geojson -o velox.geojson
+npm run autovelox -- --da velox.geojson
+```
+
+**Perché i limiti restano dal vivo e le postazioni no**: le postazioni fisse sono
+qualche migliaio di punti, un file da poche centinaia di KB. I limiti sono un
+attributo di *ogni strada* d'Italia: un GeoJSON nazionale sarebbe da centinaia di
+MB, fuori scala per un APK. Per quelli serve una query sul punto, o un servizio a
+piastrelle vettoriali.
+
+**Sui dati di altri**: i siti che pubblicano elenchi di autovelox curano un proprio
+database. Estrarlo violerebbe le loro condizioni d'uso e il diritto *sui generis*
+del costitutore di banca dati (dir. 96/9/CE, art. 102-bis L. 633/1941), oltre a
+legare l'app a un sito che può cambiare da un giorno all'altro. OpenStreetMap è
+ODbL: si può usare e ridistribuire, a patto di attribuire e mantenere la licenza.
+
 Nell'esito di un verbale la stessa mappa mostra il luogo della violazione, con il
 limite del tratto messo a confronto con quello scritto sul verbale.
 

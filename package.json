@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "sync": "npm run build && npx cap sync android",
     "android": "npm run sync && npx cap open android",
-    "apk": "npm run sync && cd android && ./gradlew assembleDebug"
+    "apk": "npm run sync && cd android && ./gradlew assembleDebug",
+    "autovelox": "node scripts/estrai-autovelox.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

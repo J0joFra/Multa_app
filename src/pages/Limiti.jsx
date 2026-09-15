@@ -6,6 +6,7 @@ import MappaLuogo from '../components/Mappa.jsx';
 import SegnaleLimite from '../components/SegnaleLimite.jsx';
 import { Avviso } from '../components/ui.jsx';
 import { analizzaLuogo, analizzaPunto, autoveloxInBbox, distanzaMetri } from '../lib/geo.js';
+import { caricaArchivio, inBbox } from '../lib/autovelox.js';
 import { caricaRicercheLimiti, salvaRicercheLimiti } from '../lib/storage.js';
 import { useVerbali } from '../lib/store.jsx';
 import { nuovoVerbale } from '../lib/verbale.js';
@@ -17,17 +18,25 @@ import { nuovoVerbale } from '../lib/verbale.js';
 // Vista d'apertura: l'Italia intera, come una mappa degli autovelox va aperta.
 const ITALIA = [42.3, 12.6];
 const ZOOM_ITALIA = 5.4;
-// Sotto questo zoom il riquadro è troppo largo: la query tornerebbe con
-// migliaia di punti, o non tornerebbe affatto.
-const ZOOM_AUTOVELOX = 11;
+// Con l'archivio in pacchetto il filtro è in memoria, quindi si può guardare
+// da più lontano; via Overpass ogni spostamento è una query, e sotto un certo
+// zoom il riquadro è così largo che non tornerebbe affatto.
+const ZOOM_ARCHIVIO = 9;
+const ZOOM_OVERPASS = 11;
+// Oltre questa soglia i marker diventano una macchia illeggibile e il disegno
+// si impalla: meglio dire di ingrandire.
+const MAX_MARKER = 400;
 
 export default function Limiti() {
   const [query, setQuery] = useState('');
   const [autovelox, setAutovelox] = useState([]);
   const [zoomTroppoLargo, setZoomTroppoLargo] = useState(true);
   const [caricoVelox, setCaricoVelox] = useState(false);
+  const [troncato, setTroncato] = useState(false);
+  const [archivio, setArchivio] = useState(undefined);  // undefined = non ancora saputo
   const attesaVista = useRef(null);
   const annullaVelox = useRef(null);
+  const ultimaVista = useRef(null);
   const [zona, setZona] = useState(null);
   const [stato, setStato] = useState('pronto'); // pronto | cerco | vuoto | errore
   const [recenti, setRecenti] = useState([]);
@@ -44,11 +53,30 @@ export default function Limiti() {
     });
   }, []);
 
-  // La mappa si muove di continuo mentre la si trascina: si interroga
-  // Overpass quando si è fermata, e la richiesta precedente si annulla.
-  function vistaCambiata({ bbox, zoom }) {
+  // L'archivio in pacchetto, se è stato generato. Null vuol dire "non c'è":
+  // da lì in poi si va di Overpass.
+  useEffect(() => {
+    caricaArchivio().then((a) => {
+      setArchivio(a);
+      if (ultimaVista.current) vistaCambiata(ultimaVista.current, a);
+    });
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * A ogni spostamento della mappa si aggiornano le postazioni a schermo.
+   * Con l'archivio è un filtro in memoria, immediato; senza, è una query a
+   * Overpass, che parte solo quando la mappa si è fermata e annulla la
+   * precedente.
+   */
+  function vistaCambiata(vista, archivioOra = archivio) {
+    ultimaVista.current = vista;
+    if (archivioOra === undefined) return;   // l'archivio sta ancora arrivando
+
+    const { bbox, zoom } = vista;
     clearTimeout(attesaVista.current);
-    if (zoom < ZOOM_AUTOVELOX) {
+    const soglia = archivioOra ? ZOOM_ARCHIVIO : ZOOM_OVERPASS;
+
+    if (zoom < soglia) {
       annullaVelox.current?.abort();
       setZoomTroppoLargo(true);
       setAutovelox([]);
@@ -56,19 +84,31 @@ export default function Limiti() {
       return;
     }
     setZoomTroppoLargo(false);
+
+    if (archivioOra) {
+      mostra(inBbox(archivioOra, bbox));
+      setCaricoVelox(false);
+      return;
+    }
+
     attesaVista.current = setTimeout(async () => {
       annullaVelox.current?.abort();
       const controllo = new AbortController();
       annullaVelox.current = controllo;
       setCaricoVelox(true);
       try {
-        setAutovelox(await autoveloxInBbox(bbox, controllo.signal));
+        mostra(await autoveloxInBbox(bbox, controllo.signal));
       } catch {
         // rete assente o Overpass occupato: la mappa resta, senza postazioni
       } finally {
         if (!controllo.signal.aborted) setCaricoVelox(false);
       }
     }, 600);
+  }
+
+  function mostra(trovate) {
+    setTroncato(trovate.length > MAX_MARKER);
+    setAutovelox(trovate.slice(0, MAX_MARKER));
   }
 
   useEffect(() => () => {
@@ -180,6 +220,8 @@ export default function Limiti() {
           numero={autovelox.length}
           troppoLargo={zoomTroppoLargo}
           carico={caricoVelox}
+          troncato={troncato}
+          daArchivio={!!archivio}
         />
 
         {zona ? (
@@ -271,7 +313,7 @@ function Risultato({ zona, cercando }) {
 }
 
 /** Quante postazioni ci sono nel riquadro che stai guardando. */
-function BarraAutovelox({ numero, troppoLargo, carico }) {
+function BarraAutovelox({ numero, troppoLargo, carico, troncato, daArchivio }) {
   if (troppoLargo) {
     return (
       <p className="flex items-center gap-2 text-xs text-gray-500 px-1">
@@ -285,9 +327,12 @@ function BarraAutovelox({ numero, troppoLargo, carico }) {
       <Camera className="w-3.5 h-3.5 shrink-0" style={{ color: '#d8232a' }} />
       {carico
         ? 'Cerco le postazioni in questa zona…'
-        : numero === 0
-          ? 'Nessun autovelox fisso mappato in questa zona'
-          : `${numero} ${numero === 1 ? 'autovelox fisso' : 'autovelox fissi'} in questa zona`}
+        : troncato
+          ? `Più di ${numero} postazioni: ingrandisci per vederle tutte`
+          : numero === 0
+            ? 'Nessun autovelox fisso mappato in questa zona'
+            : `${numero} ${numero === 1 ? 'autovelox fisso' : 'autovelox fissi'} in questa zona`}
+      {!carico && !daArchivio && numero > 0 && <span className="text-gray-400">· dal vivo</span>}
     </p>
   );
 }
